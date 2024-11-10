@@ -3,6 +3,9 @@ import json
 import logging
 import pathlib
 from typing import Dict, Iterable, List, Optional, Tuple, Type, cast
+from functools import lru_cache
+from pathlib import Path
+
 
 import hvac  # type: ignore
 import hvac.exceptions  # type: ignore
@@ -198,15 +201,34 @@ class VaultClientBase:
 
     @handle_errors()
     def _setup_kv_engine(self, path):
-        mountpoint = utils.extract_mountpoint(path)
+        mountpoint, mount_config = self._extract_mountpoint(path)
+        # utils.debug(f"Mountpoint is {mountpoint}")
         if not self.kv_engines.get(mountpoint):
-            mount_config = self.client.read(f"/sys/internal/ui/mounts/{mountpoint}").get("data")
+            if mount_config is None:
+                # utils.debug(f"Getting {mountpoint} config (old way)")
+                mount_config = self.client.read(f"/sys/internal/ui/mounts/{mountpoint}").get("data")
             kv_version = mount_config.get("options",{}).get("version", "1")
             if kv_version == "1":
                 self._setup_kv_v1_methods(mountpoint)
             elif kv_version == "2":
                 self._setup_kv_v2_methods(mountpoint)
-        self.vault_methods = self.kv_engines[mountpoint]      
+        self.vault_methods = self.kv_engines[mountpoint]
+
+    @handle_errors()
+    @lru_cache()
+    def _mounts(self):
+        return self.client.read(f"/sys/mounts").get("data", {})
+
+    @lru_cache()
+    def _extract_mountpoint(self, path):
+        # utils.debug(f"Extracting {path} mountpoint")
+        mount_point = Path()
+        for part in Path(path).parts:
+            mount_point /= part
+            # utils.debug(f"Considering {mount_point}/ as mount path")
+            if f"{mount_point}/" in self._mounts():
+                return str(mount_point), self._mounts()[f"{mount_point}/"]
+        return utils.extract_mountpoint(path), None
 
     def _build_full_path(self, path: str) -> str:
         full_path = path if path.startswith("/") else self.base_path + path
@@ -214,9 +236,10 @@ class VaultClientBase:
         return full_path
 
     def _extract_mount_secret_path(self, path) -> Tuple[str, str]:
-        fullpath = self._build_full_path(path)
-        parts = list(filter(None,fullpath.split("/")))
-        return parts[0], "/".join(parts[1:]) or "/"
+        mount_point, _ = self._extract_mountpoint(path)
+        remainder = path.partition(mount_point)[2].lstrip('/')
+        # utils.debug(f"mount_point={mount_point}, remainder={remainder}")
+        return mount_point, remainder or "/"
 
     def _browse_recursive_secrets(self, path: str) -> Iterable[str]:
         """
@@ -804,6 +827,7 @@ class VaultClient(VaultClientBase):
         elif self.vault_methods["_version"] == 2:      
             return secret["data"]["data"]
         raise exceptions.VaultInvalidRequest()
+
     @handle_errors()
     def _delete_secret(self, path: str) -> None:
         mount_point, path = self._extract_mount_secret_path(path)

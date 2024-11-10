@@ -14,3 +14,4 @@ server-chain.crt
 client.crt
 client.key
 .vscode/
+.envrc

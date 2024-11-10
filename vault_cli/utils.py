@@ -1,4 +1,16 @@
+import inspect
+import os
+
+
 from typing import Dict, Iterable
+
+
+def debug(message):
+    frame = inspect.currentframe().f_back
+    file_name = os.path.basename(frame.f_code.co_filename)
+    func_name = frame.f_code.co_name
+    line_number = frame.f_lineno
+    print(f"[{file_name} {func_name}:{line_number}] {message}")
 
 
 def path_to_nested(dict_obj: Dict) -> Dict:
