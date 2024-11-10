@@ -1,7 +1,6 @@
 version: '2'
 services:
   vault:
-    image: ewjoachim/vault-cli-dev
+    image: olehpalii/vault-cli-dev
     ports:
-    - "8200:8200"
     - "8443:8443"

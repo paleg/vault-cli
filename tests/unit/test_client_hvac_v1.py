@@ -26,7 +26,9 @@ def get_client(**additional_kwargs):
         "ca_bundle": None,
     }
     kwargs.update(additional_kwargs)
-    return client.get_client(**kwargs)
+    vault_client = client.get_client(**kwargs)
+    vault_client._setup_kv_engine(kwargs["base_path"])
+    return vault_client
 
 
 @pytest.fixture
@@ -73,7 +75,7 @@ def test_get_secret(mock_hvac_v1):
 
     assert get_client()._get_secret("bla/a") == {"value": "b"}
 
-    mock_hvac_v1.secrets.kv.v1.read_secret.assert_called_with("bla/a", mount_point="bla")
+    mock_hvac_v1.secrets.kv.v1.read_secret.assert_called_with("a", mount_point="bla")
 
 
 def test_get_secret_not_found(mock_hvac_v1):
@@ -83,8 +85,7 @@ def test_get_secret_not_found(mock_hvac_v1):
     with pytest.raises(exceptions.VaultAPIException):
         assert get_client()._get_secret("bla/a")
 
-    mock_hvac_v1.secrets.kv.v1.read_secret.assert_called_with("bla/a", mount_point="bla")
-
+    mock_hvac_v1.secrets.kv.v1.read_secret.assert_called_with("a", mount_point="bla")
 
 def test_get_secret_no_verify():
     client_obj = get_client(verify=False)
@@ -97,7 +98,7 @@ def test_list_secrets(mock_hvac_v1):
 
     assert get_client()._list_secrets("bla/a") == ["b"]
 
-    mock_hvac_v1.secrets.kv.v1.list_secrets.assert_called_with("bla/a", mount_point="bla")
+    mock_hvac_v1.secrets.kv.v1.list_secrets.assert_called_with("a", mount_point="bla")
 
 
 def test_list_secrets_sorted(mock_hvac_v1):
@@ -111,7 +112,7 @@ def test_list_secrets_empty(mock_hvac_v1):
 
     assert get_client()._list_secrets("bla/a") == []
 
-    mock_hvac_v1.secrets.kv.v1.list_secrets.assert_called_with("bla/a", mount_point="bla")
+    mock_hvac_v1.secrets.kv.v1.list_secrets.assert_called_with("a", mount_point="bla")
 
 
 def test_delete_secret(mock_hvac_v1):
@@ -152,7 +153,7 @@ def test_set_secret(mock_hvac_v1):
 
     get_client()._set_secret("bla/a", {"value": "b"})
 
-    mock_hvac_v1.secrets.kv.v1.create_or_update_secret.assert_called_with("bla/a", secret={"value": "b"}, mount_point="bla")
+    mock_hvac_v1.secrets.kv.v1.create_or_update_secret.assert_called_with("a", secret={"value": "b"}, mount_point="bla")
 
 
 def test_lookup_token(mock_hvac_v1):
