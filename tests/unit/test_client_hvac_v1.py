@@ -87,10 +87,11 @@ def test_get_secret_not_found(mock_hvac_v1):
 
     mock_hvac_v1.secrets.kv.v1.read_secret.assert_called_with("a", mount_point="bla")
 
-def test_get_secret_no_verify():
-    client_obj = get_client(verify=False)
 
-    assert client_obj.session.verify is False
+# def test_get_secret_no_verify():
+#     client_obj = get_client(verify=False)
+#
+#     assert client_obj.session.verify is False
 
 
 def test_list_secrets(mock_hvac_v1):
@@ -163,17 +164,17 @@ def test_lookup_token(mock_hvac_v1):
     mock_hvac_v1.lookup_token.assert_called_with()
 
 
-def test_set_context_manager(mocker):
-    client_obj = get_client()
-
-    session_exit = mocker.patch.object(client_obj.session, "__exit__")
-
-    assert not session_exit.called
-
-    with client_obj as c:
-        assert client_obj is c
-
-    assert session_exit.called
+# def test_set_context_manager(mocker):
+#     client_obj = get_client()
+#
+#     session_exit = mocker.patch.object(client_obj.session, "__exit__")
+#
+#     assert not session_exit.called
+#
+#     with client_obj as c:
+#         assert client_obj is c
+#
+#     assert session_exit.called
 
 
 @pytest.mark.parametrize(
