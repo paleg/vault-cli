@@ -230,20 +230,35 @@ def list_(client_obj: client.VaultClientBase, path: str):
     help=("Returns the full path as keys instead of merging paths into a tree"),
 )
 @click.argument("path", required=False, nargs=-1)
+@click.option(
+    "-o",
+    "--output",
+    type=click.File("w"),
+    help="File in which to write the secrets. "
+    "If ommited (or -), write in standard output",
+)
 @click.pass_obj
 @handle_errors()
-def get_all(client_obj: client.VaultClientBase, path: Sequence[str], flat: bool):
+def get_all(
+        client_obj: client.VaultClientBase,
+        path: Sequence[str],
+        output: Optional[TextIO],
+        flat: bool,
+):
     """
     Return multiple secrets. Return a single yaml with all the secrets located
     at the given paths. Folders are recursively explored. Without a path,
     explores all the vault.
     """
-    paths = list(path) or [""]
+    kv_paths = [engine for engine, props in client_obj._mounts().items() if props.get('type') in ["kv"]]
+    paths = list(path) or kv_paths
 
     result = client_obj.get_all_secrets(*paths, flat=flat)
 
     click.echo(
-        yaml.safe_dump(result, default_flow_style=False, explicit_start=True), nl=False
+        yaml.safe_dump(result, default_flow_style=False, explicit_start=True),
+        nl=False,
+        file=output,
     )
 
 
@@ -407,12 +422,14 @@ def set_(
     default="-",
     type=click.File(),
 )
+@click.argument("path", required=False, nargs=-1)
 @handle_errors()
 def set_all(
     client_obj: client.VaultClientBase,
     update: bool,
     force: Optional[bool],
     yaml_file: TextIO,
+    path: Sequence[str],
 ):
     """
     Set multiple secrets at once from a yaml mapping.
@@ -430,6 +447,11 @@ def set_all(
         isinstance(v, dict) for v in secrets.values()
     ):
         raise click.ClickException(error)
+
+    if path:
+        for key in list(secrets.keys()):
+            if not any(key.startswith(prefix) for prefix in path):
+                del secrets[key]
 
     try:
         client_obj.set_secrets(secrets=secrets, force=force, update=update)
